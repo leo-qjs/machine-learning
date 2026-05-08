@@ -5,7 +5,7 @@ import pandas as pd
 
 
 # ====== 1. 配置你的训练集路径 ======
-root = Path(r"D:\workspace\proj\mlt\machine-learning\dataset\Data_Challenge_PHM2023_training_data\Data_Challenge_PHM2023_training_data")
+root = Path(r"E:\workspace\WorkingProject\mlt\machine-learning\dateset\Data_Challenge_PHM2023_training_data")
 
 # 先不要太大，先把逻辑跑通
 WINDOW_SIZE = 4096
@@ -97,7 +97,7 @@ def cut_windows(data: np.ndarray, window_size: int, stride: int, max_windows: in
 
 rows = []
 
-# ====== 2. 每个标签目录抽一个 txt ======
+
 for label_dir in sorted(root.iterdir()):
     if not label_dir.is_dir():
         continue
@@ -111,36 +111,39 @@ for label_dir in sorted(root.iterdir()):
         print(f"[WARN] no txt file in {label_dir}")
         continue
 
-    # 每个标签只抽第一个txt，先跑通逻辑
-    selected_file = txt_files[0]
-
-    print(f"\n[LOAD] label={label}, folder={label_name}")
-    print(f"       file={selected_file.name}")
-
-    data = read_signal_txt(selected_file)
-
-    print(f"       raw shape = {data.shape}")
-
-    windows = cut_windows(
-        data,
-        window_size=WINDOW_SIZE,
-        stride=STRIDE,
-        max_windows=MAX_WINDOWS_PER_FILE
-    )
-
-    print(f"       windows = {len(windows)}")
-
-    for win_idx, (start, end, win) in enumerate(windows):
-        feat = extract_window_features(win)
-
-        feat["label"] = label
-        feat["label_name"] = label_name
-        feat["source_file"] = selected_file.name
-        feat["start"] = start
-        feat["end"] = end
-        feat["window_index"] = win_idx
-
-        rows.append(feat)
+    # 每个txt提取最大窗口
+    for selected_file in txt_files:
+        print(f"\n[LOAD] label={label}, folder={label_name}")
+        print(f"       file={selected_file.name}")
+    
+        data = read_signal_txt(selected_file)
+    
+        print(f"       raw shape = {data.shape}")
+    
+        windows = cut_windows(
+            data,
+            window_size=WINDOW_SIZE,
+            stride=STRIDE,
+            max_windows=None
+        )
+    
+        print(f"       windows = {len(windows)}")
+        source_path = str(selected_file.relative_to(root))
+        source_id = f"{label_name}/{selected_file.name}"
+    
+        for win_idx, (start, end, win) in enumerate(windows):
+            feat = extract_window_features(win)
+    
+            feat["label"] = label
+            feat["label_name"] = label_name
+            feat["source_file"] = selected_file.name
+            feat["start"] = start
+            feat["end"] = end
+            feat["source_path"] = source_path
+            feat["source_id"] = source_id
+            feat["window_index"] = win_idx
+    
+            rows.append(feat)
 
 
 # ====== 3. 生成机器学习样本表 ======
@@ -155,8 +158,14 @@ print(feature_df.head())
 print("\n==== label counts ====")
 print(feature_df["label"].value_counts().sort_index())
 
+print("\n==== source file counts ====")
+print(feature_df["source_id"].nunique())
+
+print("\n==== windows per source ====")
+print(feature_df.groupby("source_id").size().describe())
+
 print("\n==== columns ====")
 print(feature_df.columns.tolist())
 
-feature_df.to_csv("mini_features.csv", index=False)
-print("\nSaved: mini_features.csv")
+feature_df.to_csv("features_all_windows.csv", index=False)
+print("\nSaved: features_all_windows.csv")

@@ -17,9 +17,9 @@ from sklearn.metrics import (
 )
 
 
-feature_path = "mini_features.csv"
+# feature_path = "features_all_windows_with_split.csv"
 
-df = pd.read_csv(feature_path)
+df = pd.read_csv("features_all_windows_with_split.csv")
 
 print("==== data shape ====")
 print(df.shape)
@@ -35,13 +35,23 @@ meta_cols = [
     "source_file",
     "start",
     "end",
+    "source_path",
+    "source_id",
     "window_index",
+    "split",
 ]
 
 feature_cols = [c for c in df.columns if c not in meta_cols]
 
-X = df[feature_cols]
-y = df["label"]
+train_df = df[df["split"] == "train"].copy()
+val_df = df[df["split"] == "val"].copy()
+
+X_train = train_df[feature_cols]
+y_train = train_df["label"]
+
+X_val = val_df[feature_cols]
+y_val = val_df["label"]
+
 
 print("\n==== feature columns ====")
 print(len(feature_cols))
@@ -50,16 +60,17 @@ print(feature_cols)
 
 # 先用随机切分验证流程
 # 注意：当前只是 mini 数据，不代表真实泛化能力
-X_train, X_val, y_train, y_val = train_test_split(
-    X,
-    y,
-    test_size=0.3,                                  #30%标签作为验证集
-    random_state=42,
-    stratify=y,              #保证训练集和验证集里lable比例一致
-)
+# X_train, X_val, y_train, y_val = train_test_split(
+#     X,
+#     y,
+#     test_size=0.3,                                  #30%标签作为验证集
+#     random_state=42,
+#     stratify=y,              #保证训练集和验证集里lable比例一致
+# )
 
 print("\n==== train/val shape ====")
-print(X_train.shape, X_val.shape)
+print("train:", X_train.shape,y_train.shape)
+print("val:", X_val.shape,y_val.shape)
 
 
 models = {
@@ -73,7 +84,7 @@ models = {
     ]),
 
     "random_forest": RandomForestClassifier(
-        n_estimators=100,
+        n_estimators=200,
         max_depth=None,
         min_samples_leaf=2,
         random_state=42,
@@ -102,7 +113,7 @@ for name, model in models.items():
     print(classification_report(y_val, pred, digits=4))
 
     print("\nconfusion matrix:")
-    labels = sorted(y.unique())
+    labels = sorted(y_train.unique())
     print("labels:", labels)
     print(confusion_matrix(y_val, pred, labels=labels))
 
@@ -114,7 +125,7 @@ for name, model in models.items():
 # 保存元信息：特征列顺序、标签列表
 metadata = {
     "feature_cols": feature_cols,
-    "labels": sorted(y.unique().tolist()),
+    "labels": sorted(y_train.unique().tolist()),
 }
 
 with open(model_dir / "metadata.json", "w", encoding="utf-8") as f:
